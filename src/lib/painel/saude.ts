@@ -1,5 +1,6 @@
 export type IdDaIntegracao =
   | 'instagram'
+  | 'atendimento'
   | 'banco'
   | 'senha_painel'
   | 'assinatura_meta'
@@ -60,6 +61,37 @@ export const INTEGRACOES: readonly Integracao[] = [
     opcional: false,
   },
 ] as const;
+
+/**
+ * O Atendimento, que nao mora na lista de cima.
+ *
+ * Fica de fora porque nao existe nos quatro produtos: so o Radar tem a tela.
+ * No MEUCHAT, uma linha dizendo "Atendimento: faltando" mandaria a pessoa
+ * procurar o que ela nao comprou.
+ *
+ * E entra como obrigatoria, e nao como opcional, por causa de quem conduz: a
+ * unica forma de saber de fora se esta ligado era a palavra da compradora.
+ * Escrito na tela, uma conversa de suporte comeca sabendo. O texto abaixo
+ * explica que desligado nao e defeito, porque a palavra do estado nao tem como
+ * dizer isso.
+ */
+export const ATENDIMENTO: Integracao = {
+  id: 'atendimento',
+  nome: 'Atendimento',
+  seFaltar:
+    'Está desligado nesta cópia, e desligado não é defeito: as conversas do Instagram e do WhatsApp não ficam guardadas e a tela não aparece no menu. Para ligar, rode o comando de atualização e responda sim quando ele perguntar pelo Atendimento. O que chegar depois disso aparece; o que passou antes, não.',
+  opcional: false,
+};
+
+/**
+ * A lista que a tela mostra. `temAtendimento` vem da navegacao, que e o
+ * arquivo trocado em cada produto — e e por isso que a decisao nao mora aqui.
+ */
+export function integracoesDoPainel(
+  temAtendimento: boolean,
+): readonly Integracao[] {
+  return temAtendimento ? [...INTEGRACOES, ATENDIMENTO] : INTEGRACOES;
+}
 
 export function estadoDaIntegracao(
   integracao: Integracao,

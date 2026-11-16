@@ -20,6 +20,27 @@
 
 $ErrorActionPreference = 'Stop'
 
+<#
+  ATENCAO, quem for mexer nas frases daqui: alguem de fora depende delas.
+
+  O atendente de instalacao conduz esta atualizacao lendo a tela junto com a
+  compradora, e a conduta dele cita texto deste script ao pe da letra: os
+  titulos que comecam com `==` servem de mapa para localizar em que passo ela
+  esta, a linha `PROBLEMA:` e a frase depois dela dizem o que aconteceu, e tres
+  frases que parecem erro e nao sao ("a sua copia ja esta igual ao modelo",
+  "o conteudo ja era o mesmo" e "sem a chave secreta eu deixo o WhatsApp para
+  depois") estao escritas la como nao sendo defeito.
+
+  Teste nenhum pega isso. Se uma dessas frases mudar aqui, a conduta continua
+  passando nos testes dela enquanto manda a atendente procurar, na tela da
+  compradora, um texto que nao existe mais. Ja aconteceu em 16/11/2026, com a
+  frase do convite da organizacao.
+
+  Os titulos sao estaveis por construcao, porque cada um sai de uma funcao so.
+  Mudar qualquer uma dessas frases e combinado: avise a sessao que cuida do
+  atendente de instalacao. E antes de publicar, leia o texto na ordem em que a
+  pessoa le — foi assim, e nao por teste, que dois erros apareceram naquele dia.
+#>
 function Titulo($texto) { Write-Host ""; Write-Host "== $texto" }
 function Passo($texto)  { Write-Host "   $texto" }
 

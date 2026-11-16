@@ -28,6 +28,9 @@ export const LINKS_DO_PAINEL: readonly LinkDoPainel[] = [
 export type ConviteDeUpgrade = { href: string; label: string };
 export const NOME_DO_PAINEL = 'MeuChat';
 
+/** O MEUCHAT nao tem a tela de Atendimento: ver `ATENDIMENTO` em `saude.ts`. */
+export const TEM_ATENDIMENTO = false;
+
 /**
  * O caminho da versão simples para a Plataforma.
  *

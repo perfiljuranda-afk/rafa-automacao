@@ -2,12 +2,13 @@ import { headers } from 'next/headers';
 import { env } from '@/lib/env';
 import { WEBHOOK_FIELDS } from '@/lib/meta/subscribe';
 import {
-  INTEGRACOES,
   credencialPresente,
   estadoDaIntegracao,
+  integracoesDoPainel,
   type EstadoDaIntegracao,
   type IdDaIntegracao,
 } from '@/lib/painel/saude';
+import { TEM_ATENDIMENTO } from '@/lib/painel/navegacao';
 import { Cartao, Chip, Secao, Vazio } from '@/lib/painel/ui';
 import type { Account } from '@/lib/repo/types';
 import { ConectarBotao } from './conectar-botao';
@@ -71,8 +72,13 @@ export default async function ConfiguracaoPage() {
     endereco_app: credencialPresente(process.env.APP_URL),
     hotmart: credencialPresente(process.env.HOTMART_HOTTOK),
     segredo_cron: credencialPresente(process.env.CRON_SECRET),
+    // Lido aqui, e nao de `inboxEnabled`: aquele modulo so viaja no Radar, e
+    // esta tela viaja nos quatro produtos. O `trim` e a mesma armadilha do
+    // menu — valor colado a mao na hospedagem sai com espaco, e um espaco
+    // sobrando faz a tela dizer que esta ligado enquanto nada e guardado.
+    atendimento: process.env.RADAR_INBOX_ENABLED?.trim() === 'true',
   };
-  const estados = INTEGRACOES.map((integracao) => ({
+  const estados = integracoesDoPainel(TEM_ATENDIMENTO).map((integracao) => ({
     integracao,
     estado: estadoDaIntegracao(integracao, presentes[integracao.id]),
   }));
