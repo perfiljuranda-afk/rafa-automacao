@@ -12,6 +12,7 @@
  * O que sobra é o que o MEUCHAT realmente faz: automações, contatos e o que
  * saiu de mensagem.
  */
+import { comoBooleano, comoInteiro } from './entrada';
 import { listContacts } from '../repo/contacts';
 import { listDeliveries } from '../repo/deliveries';
 import {
@@ -64,7 +65,12 @@ export async function criarAutomacao(
     },
     [
       { position: 0, kind: 'public_reply', variants: criacao.respostaPublica, buttons: [] },
-      { position: 1, kind: 'dm', variants: criacao.dm, buttons: [] },
+      {
+        position: 1,
+        kind: 'dm',
+        variants: criacao.dm,
+        buttons: criacao.botoes.map((botao) => ({ title: botao.titulo, url: botao.link })),
+      },
     ],
   );
 
@@ -89,8 +95,8 @@ export async function criarAutomacao(
  * conferir o que acabou de autorizar, mesmo quando acerta.
  */
 export async function publicarAutomacao({ conta, chaveId, args }: ContextoDaExecucao): Promise<unknown> {
-  const id = args.automacaoId;
-  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
+  const id = comoInteiro(args.automacaoId);
+  if (id === null || id < 1) {
     throw new Error('automacaoId inválido');
   }
 
@@ -110,6 +116,12 @@ export async function publicarAutomacao({ conta, chaveId, args }: ContextoDaExec
       triggerType: automacao.triggerType,
       mediaId: automacao.mediaId,
       keywords: automacao.keywords,
+      /*
+       * `exigirSeguir` ia junto porque saveAutomation grava `?? false`:
+       * publicar pelo Claude desligava, sem avisar, a trava de so responder
+       * quem segue. Quem publica daqui nao pediu para mudar condicao nenhuma.
+       */
+      exigirSeguir: automacao.exigirSeguir,
       matchMode: automacao.matchMode,
     },
     automacao.steps.map((passo) => ({
@@ -132,11 +144,61 @@ export async function publicarAutomacao({ conta, chaveId, args }: ContextoDaExec
   };
 }
 
+/**
+ * Tira do ar uma automação que está no ar.
+ *
+ * O painel não tem um estado de "pausada": publicada ou rascunho. Então pausar
+ * é voltar para rascunho, e o texto fica guardado inteiro, para publicar de
+ * novo depois sem reescrever nada.
+ *
+ * Existe porque uma automação que responde qualquer mensagem engole as mais
+ * novas do mesmo alcance, e tirar ela do ar por uns dias era a única coisa
+ * desta conversa que só dava para fazer na tela.
+ */
+export async function pausarAutomacao({ conta, chaveId, args }: ContextoDaExecucao): Promise<unknown> {
+  const id = comoInteiro(args.automacaoId);
+  if (id === null || id < 1) {
+    throw new Error('automacaoId inválido');
+  }
+
+  const automacao = await getAutomation(id);
+  if (!automacao || automacao.accountId !== conta) throw new Error('automação não encontrada');
+
+  await saveAutomation(
+    id,
+    {
+      name: automacao.name,
+      status: 'draft',
+      triggerType: automacao.triggerType,
+      mediaId: automacao.mediaId,
+      keywords: automacao.keywords,
+      exigirSeguir: automacao.exigirSeguir,
+      matchMode: automacao.matchMode,
+    },
+    automacao.steps.map((passo) => ({
+      position: passo.position,
+      kind: passo.kind,
+      variants: passo.variants,
+      buttons: passo.buttons,
+    })),
+  );
+
+  await auditar(conta, chaveId, 'pausar_automacao', id, { nome: automacao.name });
+
+  return {
+    id,
+    nome: automacao.name,
+    publicada: false,
+    mensagem: 'Fora do ar. Ela para de responder agora, e o texto fica guardado para voltar quando você quiser.',
+  };
+}
+
 export async function executar(nome: string, contexto: ContextoDaExecucao): Promise<unknown> {
   const { conta, args, limite } = contexto;
 
-  if (nome === 'criar_automacao') return criarAutomacao(contexto, args.publicar === true);
+  if (nome === 'criar_automacao') return criarAutomacao(contexto, comoBooleano(args.publicar));
   if (nome === 'publicar_automacao') return publicarAutomacao(contexto);
+  if (nome === 'pausar_automacao') return pausarAutomacao(contexto);
 
   if (nome === 'listar_automacoes') {
     const automacoes = await listAutomations(conta);
@@ -147,6 +209,13 @@ export async function executar(nome: string, contexto: ContextoDaExecucao): Prom
       gatilho: a.triggerType,
       palavrasChave: a.keywords,
       valeParaTodosOsPosts: a.mediaId === null,
+      /*
+       * Quem responde qualquer mensagem engole o resto. Entre automacoes do
+       * mesmo alcance a mais antiga ganha, entao uma assim, publicada ha
+       * meses, faz a nova nunca disparar. Sem este campo, so o painel conta
+       * isso, e quem monta uma automacao nova daqui nao tem como saber.
+       */
+      respondeQualquerMensagem: a.matchMode === 'any',
     }));
   }
 

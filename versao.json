@@ -1,4 +1,4 @@
 {
-  "versao": "2026-11-09T10:33",
-  "novidades": "Quando a Meta cancela a inscricao do seu aplicativo - o que fazia as automacoes pararem sem aviso nenhum -, o painel percebe e religa sozinho, e a tela de Logs conta o que aconteceu em palavras. Quem nao tem permissao para religar passa a ler o motivo, em vez de uma tentativa silenciosa. So para quem tem o Radar com IA: na Base de conhecimento da para subir um PDF ou um Word que voce ja tem, e o painel monta as fontes sozinho; e o rascunho da IA, que voltava recusado ou em branco nas conversas abertas por automacao, funciona de novo."
+  "versao": "2026-11-16T10:45",
+  "novidades": "Só para quem tem o Radar: ao atualizar pelo comando, o Atendimento já pode ser ligado na mesma hora, e as conversas do Instagram e do WhatsApp passam a aparecer dentro do painel. O comando cuida da parte técnica e publica sozinho."
 }

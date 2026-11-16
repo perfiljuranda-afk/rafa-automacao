@@ -7,6 +7,7 @@ import { summarizeResults } from '@/lib/webhook-summary';
 import { liveDeps } from '@/lib/live-deps';
 import { readWebhookBody } from '@/lib/webhook-body';
 import { depois } from '@/lib/depois';
+import { iaResponde } from '@/lib/gancho-da-ia';
 import {
   recordWebhookEvent,
   markWebhookProcessed,
@@ -162,6 +163,17 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('webhook: falha ao marcar evento processado', error);
     }
+
+    /*
+     * Por ultimo, e so se esta instalacao tiver a IA ligada no modo que
+     * responde sozinha.
+     *
+     * Vem depois do registro do evento de proposito: escrever uma resposta
+     * leva de 3 a 15 segundos, e se a hospedagem cortar o tempo aqui o evento
+     * ja esta marcado nos Logs. A IA so olha conversa cuja ultima mensagem
+     * ainda e do cliente — ou seja, o que a automacao acima nao respondeu.
+     */
+    await iaResponde();
   });
 
   // Sempre 200 (menos assinatura inválida/configuração ausente): o evento já

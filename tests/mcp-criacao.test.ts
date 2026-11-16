@@ -21,6 +21,7 @@ describe('validação da criação de automação por MCP', () => {
         mediaId: null,
         respostaPublica: [],
         dm: ['Primeira mensagem', 'Segunda mensagem'],
+        botoes: [],
       },
     });
   });
@@ -31,6 +32,73 @@ describe('validação da criação de automação por MCP', () => {
     ['só com espaços', { nome: 'Sem DM', gatilho: 'comment', dm: ['  '] }],
   ])('recusa DM %s', (_caso, entrada) => {
     expect(validarCriacaoDeAutomacao(entrada).ok).toBe(false);
+  });
+
+  it('aceita a lista entregue como texto em JSON, que e o que um cliente manda', () => {
+    expect(
+      validarCriacaoDeAutomacao({
+        nome: 'Lista como texto',
+        gatilho: 'comment',
+        palavrasChave: '["kit"]',
+        respostaPublica: '["Te mandei no direct","Ja esta no seu direct"]',
+        dm: '["Primeira","Segunda"]',
+      }),
+    ).toMatchObject({
+      ok: true,
+      dados: {
+        palavrasChave: ['kit'],
+        respostaPublica: ['Te mandei no direct', 'Ja esta no seu direct'],
+        dm: ['Primeira', 'Segunda'],
+      },
+    });
+  });
+
+  it('aceita um texto unico como uma variacao', () => {
+    expect(
+      validarCriacaoDeAutomacao({ nome: 'Uma variacao', gatilho: 'comment', dm: 'Olá' }),
+    ).toMatchObject({ ok: true, dados: { dm: ['Olá'] } });
+  });
+
+  it('nao parte um texto que so comeca com colchete', () => {
+    expect(
+      validarCriacaoDeAutomacao({
+        nome: 'Colchete',
+        gatilho: 'comment',
+        dm: '[promo] o link está aqui',
+      }),
+    ).toMatchObject({ ok: true, dados: { dm: ['[promo] o link está aqui'] } });
+  });
+
+  it('aceita botao na DM, inclusive entregue como texto em JSON', () => {
+    expect(
+      validarCriacaoDeAutomacao({
+        nome: 'Com botao',
+        gatilho: 'comment',
+        dm: 'O link esta no botao',
+        botoes: '[{"titulo":"Entrar no grupo","link":"https://exemplo.com/grupo"}]',
+      }),
+    ).toMatchObject({
+      ok: true,
+      dados: { botoes: [{ titulo: 'Entrar no grupo', link: 'https://exemplo.com/grupo' }] },
+    });
+  });
+
+  it('sem botoes, a lista nasce vazia', () => {
+    expect(
+      validarCriacaoDeAutomacao({ nome: 'Sem botao', gatilho: 'comment', dm: 'Oi' }),
+    ).toMatchObject({ ok: true, dados: { botoes: [] } });
+  });
+
+  it.each([
+    ['link sem http', [{ titulo: 'Ir', link: 'exemplo.com' }]],
+    ['titulo vazio', [{ titulo: '   ', link: 'https://exemplo.com' }]],
+    ['titulo longo', [{ titulo: 'um titulo bem maior do que caberia', link: 'https://exemplo.com' }]],
+    ['mais de tres', [1, 2, 3, 4].map(() => ({ titulo: 'Ir', link: 'https://exemplo.com' }))],
+    ['item que nao e objeto', ['Entrar no grupo']],
+  ])('recusa botao com %s', (_caso, botoes) => {
+    expect(
+      validarCriacaoDeAutomacao({ nome: 'Botao ruim', gatilho: 'comment', dm: 'Oi', botoes }).ok,
+    ).toBe(false);
   });
 
   it('recusa gatilho fora de comment e dm', () => {

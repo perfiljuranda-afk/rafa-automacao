@@ -14,6 +14,7 @@
  * mal-entendido aqui é uma DM que já saiu.
  */
 
+import { comoInteiro } from './entrada';
 import type { Escopo } from '../api/chave';
 
 export type DefinicaoDeFerramenta = {
@@ -37,9 +38,11 @@ export const FERRAMENTAS: DefinicaoDeFerramenta[] = [
     escopo: 'leitura',
     title: 'Listar automações',
     description:
-      'Mostra as automações da conta: nome, se está no ar ou em rascunho, o gatilho ' +
-      'e as palavras-chave. Use antes de criar uma nova, para não repetir palavra-chave ' +
-      'já usada, e para pegar o id que publicar_automacao precisa.',
+      'Mostra as automações da conta: nome, se está no ar ou em rascunho, o gatilho, ' +
+      'as palavras-chave e se ela responde qualquer mensagem. Use antes de criar uma ' +
+      'nova, para não repetir palavra-chave já usada e para ver se alguma responde ' +
+      'qualquer mensagem, porque essa pega na frente das mais novas do mesmo alcance. ' +
+      'Também é daqui que vem o id que publicar_automacao precisa.',
     inputSchema: { type: 'object', additionalProperties: false },
   },
   {
@@ -110,6 +113,21 @@ export const FERRAMENTAS: DefinicaoDeFerramenta[] = [
           items: { type: 'string' },
           description: 'Variações da DM, uma por item. Uma delas é sorteada a cada disparo.',
         },
+        botoes: {
+          type: 'array',
+          maxItems: 3,
+          description:
+            'Botões que vão junto da DM. O título aparece no botão e o link é para onde ele leva.',
+          items: {
+            type: 'object',
+            properties: {
+              titulo: { type: 'string', description: 'Até 20 caracteres.' },
+              link: { type: 'string', description: 'Começa com http:// ou https://.' },
+            },
+            required: ['titulo', 'link'],
+            additionalProperties: false,
+          },
+        },
       },
       required: ['nome', 'gatilho', 'dm'],
       additionalProperties: false,
@@ -132,6 +150,25 @@ export const FERRAMENTAS: DefinicaoDeFerramenta[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'pausar_automacao',
+    title: 'Pausar automação',
+    escopo: 'escrita',
+    description:
+      'Tira do ar uma automação que está no ar. Ela para de responder na hora e o ' +
+      'texto fica guardado, para publicar de novo quando quiser. Use quando uma ' +
+      'automação antiga responde qualquer mensagem e fica na frente da nova. ' +
+      'DIGA qual automação vai sair do ar e espere a pessoa confirmar antes de ' +
+      'chamar. O id vem de listar_automacoes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        automacaoId: { type: 'integer', minimum: 1, description: 'Id da automação.' },
+      },
+      required: ['automacaoId'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export function ferramentasParaEscopos(escopos: readonly string[]): DefinicaoDeFerramenta[] {
@@ -143,6 +180,7 @@ export function acharFerramenta(nome: unknown): DefinicaoDeFerramenta | null {
 }
 
 export function limiteDaFerramenta(valor: unknown): number {
-  if (typeof valor !== 'number' || !Number.isInteger(valor) || valor < 1) return 50;
-  return Math.min(valor, 200);
+  const pedido = comoInteiro(valor);
+  if (pedido === null || pedido < 1) return 50;
+  return Math.min(pedido, 200);
 }

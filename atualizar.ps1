@@ -36,6 +36,33 @@ function PerguntaSecreta($rotulo) {
 
 function Pergunta($rotulo) { return (Read-Host -Prompt "   $rotulo").Trim() }
 
+# Sim ou nao aceitando o que a pessoa realmente digita. Qualquer outra coisa e
+# nao, e o nao aqui nunca estraga nada: so deixa de ligar.
+function PerguntaSimNao($rotulo) {
+  $resposta = (Read-Host -Prompt "   $rotulo (sim/nao)").Trim().ToLower()
+  return ($resposta -eq 'sim' -or $resposta -eq 's' -or $resposta -eq 'yes' -or $resposta -eq 'y')
+}
+
+# A palavra que a Meta repete para provar que o endereco e seu.
+#
+# Sorteada, e nao escolhida na hora: palavra inventada no momento sai curta e
+# acaba digitada diferente nos dois lugares, e o portal responde so "nao
+# consegui verificar", sem dizer qual dos dois lados esta errado.
+function Segredo {
+  $alfabeto = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  $gerador = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try {
+    $texto = New-Object System.Text.StringBuilder
+    $byte = New-Object byte[] 1
+    while ($texto.Length -lt 48) {
+      $gerador.GetBytes($byte)
+      if ($byte[0] -ge 248) { continue }
+      [void]$texto.Append($alfabeto[$byte[0] % $alfabeto.Length])
+    }
+    return $texto.ToString()
+  } finally { $gerador.Dispose() }
+}
+
 function ChamarApi($metodo, $url, $cabecalhos, $corpo) {
   try {
     $parametros = @{ Method = $metodo; Uri = $url; Headers = $cabecalhos; ErrorAction = 'Stop' }
@@ -149,8 +176,10 @@ Write-Host "Serve para os dois casos: virar Radar pela primeira vez e trazer a"
 Write-Host "versao nova para um Radar que ja existe. O banco, os contatos e as"
 Write-Host "automacoes continuam onde estao - nada aqui apaga nada."
 Write-Host ""
-Write-Host "Antes de comecar: aceite o convite da organizacao que chegou no seu"
-Write-Host "e-mail. Sem ele, o modelo do Radar nao aparece para a sua conta."
+Write-Host "Antes de comecar, se voce instalou sozinha pelo GitHub: aceite o"
+Write-Host "convite da organizacao que chegou no seu e-mail, senao o modelo do"
+Write-Host "Radar nao aparece para a sua conta. Se voce instalou com a nossa"
+Write-Host "ajuda, pelo site, nao ha convite nenhum para aceitar."
 Write-Host ""
 
 Titulo "As duas chaves temporarias"
@@ -173,21 +202,45 @@ Passo "GitHub: $($usuario.login)"
 $eu = ChamarApi 'GET' 'https://api.vercel.com/v2/user' $cabecalhoVercel $null
 Passo "Vercel: $($eu.user.username)"
 
-# O 404 aqui quer dizer "esse repositório não existe para você" — é assim que o
-# GitHub responde para repositório privado que o token não enxerga. O convite
-# não aceito é a causa em quase todos os casos.
+<#
+  O 404 aqui quer dizer "esse repositorio nao existe para voce" — e assim que o
+  GitHub responde para repositorio privado que o token nao enxerga.
+
+  Ate 16/11/2026 esta mensagem dizia uma coisa so: aceite o convite da
+  organizacao. Isso ficou errado quando a instalacao mudou. Quem instala pelo
+  site nao entra em organizacao nenhuma, de proposito: o servidor le o modelo
+  com uma credencial nossa e escreve no repositorio dela com a autorizacao que
+  ela ja deu. Convite privado nao da para automatizar — o GitHub so cria um
+  convite PENDENTE, e aceitar e da pessoa.
+
+  Ou seja: mandar essa gente procurar um convite que nunca foi enviado e
+  mandar procurar o que nao existe. Em 12/11 um 404 desses chegou a tela de uma
+  compradora como "Not Found", e ela nao tinha o que fazer.
+
+  Por isso a mensagem conta os dois casos, e quem instalou pelo site sai daqui
+  com um endereco, e nao com uma busca no e-mail.
+#>
 Titulo "Conferindo o acesso ao modelo do Radar"
 $modeloInfo = TentarApi 'GET' "https://api.github.com/repos/$MODELO" $cabecalhoGitHub $null
 if (-not $modeloInfo) {
   Write-Host ""
-  Write-Host "Nao consegui enxergar o modelo do Radar com a sua conta."
-  Write-Host "Quase sempre e o convite da organizacao, que ainda nao foi aceito:"
+  Write-Host "Nao consegui ler o modelo do Radar com a sua conta do GitHub."
+  Write-Host ""
+  Write-Host "Ha dois motivos, e o caminho e diferente em cada um."
+  Write-Host ""
+  Write-Host "SE VOCE INSTALOU O PAINEL COM A NOSSA AJUDA, pelo site, isto e"
+  Write-Host "esperado: nesse caminho a sua conta nao entra em organizacao"
+  Write-Host "nenhuma, e convite nenhum foi enviado. Nao procure no e-mail,"
+  Write-Host "porque nao existe. Volte em atendente-instalacao.vercel.app com o"
+  Write-Host "e-mail e o WhatsApp da compra, que a gente resolve de la."
+  Write-Host ""
+  Write-Host "SE VOCE INSTALOU SOZINHA, pelo GitHub, e o convite da organizacao:"
   Write-Host ""
   Write-Host "  1. procure no seu e-mail o convite do GitHub para adeus-mensalidade"
   Write-Host "  2. clique em Join @adeus-mensalidade"
   Write-Host "  3. se nao achar o e-mail, abra github.com/orgs/adeus-mensalidade/invitation"
   Write-Host "  4. volte aqui e rode de novo"
-  Erro "o convite da organizacao precisa estar aceito."
+  Erro "nao consegui ler o modelo do Radar com a sua conta."
 }
 Passo "modelo visivel: $MODELO"
 
@@ -206,6 +259,79 @@ if (-not [int]::TryParse($escolha, [ref]$indice) -or $indice -lt 1 -or $indice -
 }
 $projeto = $lista[$indice - 1]
 Passo "escolhido: $($projeto.name)"
+
+<#
+  O Atendimento, ligado aqui e nao a mao.
+
+  Ate 16/11/2026 o comando trazia o codigo do Atendimento e parava ai: a tela
+  so aparecia depois de a pessoa criar RADAR_INBOX_ENABLED na Vercel e fazer
+  Redeploy. Dois passos tecnicos no meio de um caminho que existe justamente
+  para nao ter nenhum, e o segundo deles e o que mais some.
+
+  As perguntas ficam ANTES da confirmacao, de proposito: depois do SIM o
+  comando nao pede mais nada, e quem saiu de perto encontra tudo pronto.
+#>
+Titulo "O Atendimento"
+Passo "As conversas do Instagram e do WhatsApp dentro do painel: quem falou"
+Passo "com voce, o que a automacao respondeu, e o campo para responder ali"
+Passo "mesmo. Ligar nao mexe nas suas automacoes, que seguem respondendo."
+
+$gravadas = @{}
+$envDeAgora = TentarApi 'GET' "https://api.vercel.com/v9/projects/$($projeto.id)/env?decrypt=true" $cabecalhoVercel $null
+foreach ($e in @($envDeAgora.envs)) {
+  if ($e.target -contains 'production' -and $e.key) { $gravadas[$e.key] = $e.value }
+}
+
+$novasVariaveis = @{}
+$vouLigar = $false
+# O guia avisa que espaco sobrando na Vercel mostra a chave ligada e deixa o
+# painel desligado. Aqui o espaco nao chega: o valor sai escrito do script.
+$jaLigado = (($gravadas['RADAR_INBOX_ENABLED'] + '').Trim() -eq 'true')
+
+if ($jaLigado) {
+  Passo "ja esta ligado no seu painel"
+} else {
+  $vouLigar = PerguntaSimNao "Quer ligar o Atendimento agora?"
+  if ($vouLigar) { $novasVariaveis['RADAR_INBOX_ENABLED'] = 'true' }
+}
+
+$palavraDoWhatsapp = ''
+$faltaOPortal = $false
+if ($jaLigado -or $vouLigar) {
+  if ($gravadas.ContainsKey('WHATSAPP_APP_SECRET') -and $gravadas.ContainsKey('WHATSAPP_VERIFY_TOKEN')) {
+    Passo "o WhatsApp ja esta pronto para receber"
+  } else {
+    Passo ""
+    Passo "O Instagram usa o mesmo endereco que ja recebe os comentarios, e"
+    Passo "nao precisa de nada novo. O WhatsApp precisa de dois valores."
+    if (PerguntaSimNao "Voce usa o WhatsApp no painel?") {
+      Passo "A chave secreta esta no portal da Meta, no aplicativo que tem o"
+      Passo "produto WhatsApp: Configuracoes do app, Basico, botao Mostrar."
+      Passo "Tem que ser a do aplicativo do WhatsApp. Com a de outro, a Meta"
+      Passo "entrega e o painel recusa toda mensagem, sem aviso em tela nenhuma."
+      Passo "O texto colado nao aparece na tela."
+      $chaveDoApp = ''
+      if (-not $gravadas.ContainsKey('WHATSAPP_APP_SECRET')) {
+        $chaveDoApp = PerguntaSecreta "Chave secreta do aplicativo do WhatsApp"
+      }
+      # Enter em branco aqui nao derruba a atualizacao: o codigo novo e o
+      # Instagram seguem, e o WhatsApp fica para a proxima vez. Parar tudo por
+      # causa de um valor que ela pode nem ter em maos agora seria pior.
+      if (-not $gravadas.ContainsKey('WHATSAPP_APP_SECRET') -and -not $chaveDoApp) {
+        Passo "sem a chave secreta eu deixo o WhatsApp para depois; o resto continua"
+      } else {
+        if ($chaveDoApp) { $novasVariaveis['WHATSAPP_APP_SECRET'] = $chaveDoApp }
+        if ($gravadas.ContainsKey('WHATSAPP_VERIFY_TOKEN')) {
+          $palavraDoWhatsapp = $gravadas['WHATSAPP_VERIFY_TOKEN']
+        } else {
+          $palavraDoWhatsapp = Segredo
+          $novasVariaveis['WHATSAPP_VERIFY_TOKEN'] = $palavraDoWhatsapp
+        }
+        $faltaOPortal = $true
+      }
+    }
+  }
+}
 
 Titulo "A sua copia do Radar"
 $nomeRepo = 'plataforma'
@@ -253,6 +379,8 @@ if ($jaEraORadar) {
   Passo "de:   $ligadoAgora"
   Passo "para: $($copia.full_name)"
 }
+if ($vouLigar) { Passo "ligar o Atendimento, para as conversas aparecerem no painel" }
+if ($novasVariaveis.ContainsKey('WHATSAPP_APP_SECRET')) { Passo "deixar o WhatsApp pronto para receber mensagem" }
 Passo "o banco, os contatos, as automacoes e a sua senha ficam como estao"
 $confirma = Pergunta "Digite SIM para continuar"
 if ($confirma -ne 'SIM') { Erro "nada foi alterado." }
@@ -271,6 +399,18 @@ if (-not $jaEraORadar) {
     type = 'github'; repo = $copia.full_name
   } | Out-Null
   Passo "trocado"
+}
+
+# Antes da publicacao, e nao depois: variavel gravada depois nao vale para o
+# deploy que ja saiu, e e por isso que o caminho a mao precisa de um Redeploy
+# no fim. Aqui a publicacao ja sai com elas dentro.
+if ($novasVariaveis.Count -gt 0) {
+  Titulo "Ligando o Atendimento"
+  $paraGravar = $novasVariaveis.GetEnumerator() | ForEach-Object {
+    @{ key = $_.Key; value = $_.Value; type = 'encrypted'; target = @('production') }
+  }
+  ChamarApi 'POST' "https://api.vercel.com/v10/projects/$($projeto.id)/env?upsert=true" $cabecalhoVercel @($paraGravar) | Out-Null
+  Passo "$($novasVariaveis.Count) valor(es) gravado(s)"
 }
 
 Titulo "Publicando"
@@ -308,3 +448,38 @@ Write-Host "   Automacoes, Contatos e Logs, a troca nao pegou - me chame."
 Write-Host ""
 Write-Host "   Agora pode revogar as duas chaves que voce colou no comeco."
 Write-Host ""
+
+if ($jaLigado -or $vouLigar) {
+  Write-Host "   O Atendimento"
+  Write-Host ""
+  Write-Host "   O menu tem que mostrar Atendimento. E ali que as conversas"
+  Write-Host "   aparecem, com a ficha da pessoa do lado."
+  Write-Host ""
+  Write-Host "   Falta uma conferencia que so da para fazer no portal da Meta:"
+  Write-Host "   no produto Instagram, em Webhooks, o campo messages precisa"
+  Write-Host "   estar assinado, alem do comments que voce ja usa. E o"
+  Write-Host "   aplicativo precisa estar Ao vivo: em modo de desenvolvimento"
+  Write-Host "   ele aceita tudo, mostra tudo pronto e nao entrega mensagem de"
+  Write-Host "   quem esta fora dele."
+  Write-Host ""
+  if ($faltaOPortal) {
+    Write-Host "   O WhatsApp, no portal da Meta"
+    Write-Host ""
+    Write-Host "   Guarde estes dois valores, que sao os do seu painel:"
+    Write-Host ""
+    if ($curto) { Write-Host "     Endereco:  https://$curto/api/webhooks/whatsapp" }
+    else        { Write-Host "     Endereco:  o endereco do seu painel com /api/webhooks/whatsapp no fim" }
+    Write-Host "     Palavra:   $palavraDoWhatsapp"
+    Write-Host ""
+    Write-Host "   No produto WhatsApp, em Configuracao, Webhooks, Editar:"
+    Write-Host "   cole o endereco em URL de callback e a palavra em Token de"
+    Write-Host "   verificacao, clique em Verificar e salvar, e assine o campo"
+    Write-Host "   messages na mesma tela. Esse campo e o passo que mais some:"
+    Write-Host "   sem ele a Meta aceita o endereco e nao entrega nada."
+    Write-Host ""
+  }
+  Write-Host "   Travou no portal da Meta? Volte em"
+  Write-Host "   atendente-instalacao.vercel.app com o e-mail e o WhatsApp da"
+  Write-Host "   compra: a Dani conduz essa parte com voce, uma tela por vez."
+  Write-Host ""
+}
