@@ -106,17 +106,6 @@
 .quiz-dica { text-align: left; background: var(--q-amarelo-tenue); border: 2px dashed var(--q-tinta); border-radius: 16px; padding: 14px 16px; font-size: 16px; line-height: 1.5; margin: 6px 0 8px; }
 .quiz-dica strong { display: block; font-family: var(--q-titulo); font-size: 19px; color: var(--q-rosa-escuro); }
 
-/* Pega errada × certa */
-.pega-comparacao { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 14px; }
-.pega { margin: 0; border: 3px solid var(--q-tinta); border-radius: 18px; padding: 12px 10px; }
-.pega svg { width: 100%; max-width: 130px; height: auto; display: block; margin: 0 auto 8px; }
-.pega figcaption { font-size: 14px; line-height: 1.35; color: var(--q-tinta-media); }
-.pega figcaption strong { display: block; font-family: var(--q-titulo); font-size: 18px; }
-.pega-errada { background: var(--q-urgente-tenue); }
-.pega-errada strong { color: var(--q-urgente); }
-.pega-certa { background: var(--q-ok-tenue); }
-.pega-certa strong { color: var(--q-ok); }
-
 /* Seus sinais */
 .quiz-sinais { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
 .quiz-sinais li { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; border-radius: 12px; padding: 10px 12px; }
@@ -151,5 +140,4 @@
 @media (max-width: 380px) {
   .quiz-cartao h1 { font-size: 26px; }
   .quiz-cartao h2 { font-size: 22px; }
-  .pega-comparacao { gap: 8px; }
 }

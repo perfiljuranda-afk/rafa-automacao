@@ -27,34 +27,3 @@ export const ICONES: Record<Icone, string> = {
   peito: `<svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" fill="#fbe2d6" stroke="#2b2024" stroke-width="6"/><circle cx="60" cy="60" r="24" fill="#d99a86"/><circle cx="60" cy="60" r="9" fill="#b9705d"/></svg>`,
   fissura: `<svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" fill="#fbe2d6" stroke="#2b2024" stroke-width="6"/><circle cx="60" cy="60" r="24" fill="#d99a86"/><circle cx="60" cy="60" r="10" fill="#b9705d"/><path d="M52 50 L60 58 L56 64 L66 72" fill="none" stroke="#e0483a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
-
-/*
- * Pega errada × pega certa, vista de frente: a aréola e o contorno da boca do
- * bebê. Errada: boca pequena, só no bico. Certa: boca bem aberta, cobrindo a
- * aréola, mais por baixo do que por cima.
- */
-export const ILUSTRACAO_PEGA = `
-<div class="pega-comparacao">
-  <figure class="pega pega-errada">
-    <svg viewBox="0 0 140 140" aria-hidden="true">
-      <circle cx="70" cy="70" r="60" fill="#fbe2d6" stroke="#2b2024" stroke-width="5"/>
-      <circle cx="70" cy="70" r="30" fill="#d99a86"/>
-      <circle cx="70" cy="70" r="11" fill="#b9705d"/>
-      <ellipse cx="70" cy="70" rx="17" ry="13" fill="none" stroke="#e0483a" stroke-width="6" stroke-dasharray="7 5"/>
-      <circle cx="118" cy="22" r="17" fill="#e0483a" stroke="#2b2024" stroke-width="4"/>
-      <path d="M110 14 L126 30 M126 14 L110 30" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
-    </svg>
-    <figcaption><strong>Pega errada</strong> Boca pequena, só no bico. Aperta, dói e machuca.</figcaption>
-  </figure>
-  <figure class="pega pega-certa">
-    <svg viewBox="0 0 140 140" aria-hidden="true">
-      <circle cx="70" cy="70" r="60" fill="#fbe2d6" stroke="#2b2024" stroke-width="5"/>
-      <circle cx="70" cy="70" r="30" fill="#d99a86"/>
-      <circle cx="70" cy="70" r="11" fill="#b9705d"/>
-      <ellipse cx="70" cy="76" rx="40" ry="34" fill="none" stroke="#3fa266" stroke-width="6" stroke-dasharray="7 5"/>
-      <circle cx="118" cy="22" r="17" fill="#3fa266" stroke="#2b2024" stroke-width="4"/>
-      <path d="M110 22 L116 28 L127 16" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <figcaption><strong>Pega certa</strong> Boca bem aberta, abocanha a aréola, mais por baixo.</figcaption>
-  </figure>
-</div>`;

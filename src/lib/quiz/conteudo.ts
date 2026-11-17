@@ -9,7 +9,7 @@
  *
  *   Início
  *    └─ Sente dor para amamentar?
- *        ├─ SIM → ALERTA: PEGA ERRADA (desenho pega certa × errada)
+ *        ├─ SIM → ALERTA: PEGA ERRADA
  *        │        ├─ Tem fissura?            SIM → ALERTA: DOR + FISSURA = PEGA ERRADA
  *        │        ├─ Peito vermelho/febre?   SIM → ATENÇÃO: SINAL DE MASTITE
  *        │        └─ Bebê ganhando peso?     NÃO → SINAL FORTÍSSIMO
@@ -88,8 +88,6 @@ export type Alerta = {
   icone: Icone;
   titulo: string;
   texto: string;
-  /** Mostra o desenho de pega certa × pega errada. */
-  mostrarPega?: boolean;
   /** Caixinha didática "Você sabia?". */
   dica?: string;
 };
@@ -134,8 +132,7 @@ export const PERGUNTAS: Pergunta[] = [
             selo: 'ALERTA: PEGA ERRADA!',
             icone: 'aviso',
             titulo: 'Dor para amamentar não é normal',
-            texto: 'Se você sente dor para amamentar, é muito provável que o seu bebê não esteja fazendo a pega correta. Olha a diferença:',
-            mostrarPega: true,
+            texto: 'Se você sente dor para amamentar, é muito provável que o seu bebê não esteja fazendo a pega correta.',
             dica: 'Um desconforto nos primeiros segundos pode acontecer. Dor que continua durante a mamada é sinal de que algo precisa ser ajustado.',
           }
         : {

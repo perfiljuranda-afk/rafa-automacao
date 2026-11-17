@@ -4,7 +4,7 @@
  * `data-acao`; quem desenha a tela escuta os cliques.
  */
 
-import { ICONES, ILUSTRACAO_PEGA } from './icones';
+import { ICONES } from './icones';
 import { MARCA, PRODUTOS, RESULTADOS, type Alerta, type Pergunta, type SlugResultado } from './conteudo';
 
 const esc = (s: string) =>
@@ -59,7 +59,6 @@ export function telaAlerta(a: Alerta): string {
   <p class="quiz-selo-grande">${esc(a.selo)}</p>
   <h2>${esc(a.titulo)}</h2>
   <p class="quiz-texto">${esc(a.texto)}</p>
-  ${a.mostrarPega ? ILUSTRACAO_PEGA : ''}
   ${a.dica ? `<aside class="quiz-dica"><strong>Você sabia?</strong> ${esc(a.dica)}</aside>` : ''}
   <button class="quiz-botao" data-acao="continuar">Continuar o diagnóstico →</button>
   <button class="quiz-voltar" data-acao="voltar">← Voltar</button>
