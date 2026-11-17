@@ -3,22 +3,25 @@
  *
  * TUDO o que a mãe lê no quiz mora neste arquivo: produtos, perguntas,
  * alertas e as páginas de resultado. Para trocar um texto, um preço ou o
- * link do checkout, mexa só aqui.
+ * link do checkout, mexa só aqui. Os desenhos ficam em icones.ts.
  *
  * O caminho de cada mãe:
  *
  *   Início
  *    └─ Sente dor para amamentar?
- *        ├─ SIM → alerta "dor não é normal"
- *        │        ├─ Tem fissura / machucado no bico?
- *        │        ├─ O peito está vermelho, empedrado, quente ou com febre?
- *        │        └─ O bebê está ganhando peso?
+ *        ├─ SIM → ALERTA: PEGA ERRADA (desenho pega certa × errada)
+ *        │        ├─ Tem fissura?            SIM → ALERTA: DOR + FISSURA = PEGA ERRADA
+ *        │        ├─ Peito vermelho/febre?   SIM → ATENÇÃO: SINAL DE MASTITE
+ *        │        └─ Bebê ganhando peso?     NÃO → SINAL FORTÍSSIMO
  *        │            → resultado: dor-com-mastite | dor-com-fissura | dor-pega-errada
- *        └─ NÃO → O bebê está ganhando peso?
- *                 ├─ NÃO → alerta "sinal fortíssimo" → fraldas → resultado: sem-dor-sem-peso
- *                 └─ SIM / NÃO SEI → quanto tempo mama → fraldas
- *                       → resultado: sem-dor-sinais-de-alerta | tudo-certo
+ *        └─ NÃO → ÓTIMO SINAL (mas dor não é o único sinal)
+ *                 └─ Bebê ganhando peso?
+ *                     ├─ NÃO → SINAL FORTÍSSIMO → fraldas → resultado: sem-dor-sem-peso
+ *                     └─ SIM / NÃO SEI → como são as mamadas → fraldas
+ *                           → resultado: sem-dor-sinais-de-alerta | tudo-certo
  */
+
+import type { Icone } from './icones';
 
 export const MARCA = {
   nome: 'Dra. Aline Welz',
@@ -70,14 +73,30 @@ export const PRODUTOS: Record<ChaveProduto, Produto> = {
   },
 };
 
-// ─── Perguntas ──────────────────────────────────────────────────────────────
+// ─── Perguntas e alertas ────────────────────────────────────────────────────
 
 export type Resposta = Record<string, string>;
 
 export type Opcao = { valor: string; texto: string };
 
+export type Tom = 'alerta' | 'urgente' | 'bom';
+
+export type Alerta = {
+  tom: Tom;
+  /** A faixa em letras grandes, ex.: "ALERTA: PEGA ERRADA!" */
+  selo: string;
+  icone: Icone;
+  titulo: string;
+  texto: string;
+  /** Mostra o desenho de pega certa × pega errada. */
+  mostrarPega?: boolean;
+  /** Caixinha didática "Você sabia?". */
+  dica?: string;
+};
+
 export type Pergunta = {
   id: string;
+  icone: Icone;
   texto: string;
   ajuda?: string;
   opcoes: Opcao[];
@@ -87,38 +106,70 @@ export type Pergunta = {
   alerta?: (r: Resposta) => Alerta | null;
 };
 
-export type Alerta = { titulo: string; texto: string; tom: 'alerta' | 'urgente' };
-
 const SIM_NAO: Opcao[] = [
   { valor: 'sim', texto: 'Sim' },
   { valor: 'nao', texto: 'Não' },
 ];
 
+/** Usado na pergunta de peso pelos dois ramos. */
+const ALERTA_PESO: Alerta = {
+  tom: 'urgente',
+  selo: 'SINAL FORTÍSSIMO!',
+  icone: 'urgente',
+  titulo: 'Bebê que não ganha peso pode não estar tirando leite suficiente',
+  texto: 'Quando o bebê não ganha peso, é um sinal fortíssimo de que ele não está conseguindo extrair o leite de que precisa. A causa mais comum é a pega. Converse com o pediatra o quanto antes.',
+  dica: 'Ficar muito tempo no peito não quer dizer que o bebê está mamando bem. Com a pega rasa, ele suga, suga… e o leite quase não sai.',
+};
+
 export const PERGUNTAS: Pergunta[] = [
   {
     id: 'dor',
+    icone: 'peito',
     texto: 'Você está sentindo dor para amamentar?',
     opcoes: SIM_NAO,
     alerta: (r) =>
       r.dor === 'sim'
         ? {
             tom: 'alerta',
-            titulo: 'Atenção: amamentar não deveria doer',
-            texto: 'Se você sente dor para amamentar, é muito provável que o seu bebê não esteja fazendo a pega correta. Vamos entender melhor o seu caso.',
+            selo: 'ALERTA: PEGA ERRADA!',
+            icone: 'aviso',
+            titulo: 'Dor para amamentar não é normal',
+            texto: 'Se você sente dor para amamentar, é muito provável que o seu bebê não esteja fazendo a pega correta. Olha a diferença:',
+            mostrarPega: true,
+            dica: 'Um desconforto nos primeiros segundos pode acontecer. Dor que continua durante a mamada é sinal de que algo precisa ser ajustado.',
           }
-        : null,
+        : {
+            tom: 'bom',
+            selo: 'ÓTIMO SINAL!',
+            icone: 'ok',
+            titulo: 'Que bom que não dói!',
+            texto: 'Não sentir dor é um ótimo sinal. Mas atenção: a dor não é o único jeito de saber se a pega está certa. Vamos conferir se o seu bebê está conseguindo tirar leite suficiente.',
+          },
   },
 
   // Ramo COM dor
   {
     id: 'fissura',
+    icone: 'fissura',
     texto: 'Você tem fissura, rachadura ou machucado no bico do peito?',
     ajuda: 'Pode ser um corte, uma ferida, sangramento ou o bico saindo "amassado" depois da mamada.',
     opcoes: SIM_NAO,
     quando: (r) => r.dor === 'sim',
+    alerta: (r) =>
+      r.fissura === 'sim'
+        ? {
+            tom: 'alerta',
+            selo: 'ALERTA: PEGA ERRADA!',
+            icone: 'aviso',
+            titulo: 'Dor + fissura = é muito provável que a pega esteja errada',
+            texto: 'A fissura é o machucado que a pega errada deixa no bico. Quando o bebê pega só o bico, ele aperta e fere a cada mamada.',
+            dica: 'Boa notícia: quando a pega é corrigida, o bico para de ser machucado e consegue cicatrizar.',
+          }
+        : null,
   },
   {
     id: 'mastite',
+    icone: 'peito',
     texto: 'Seu peito está vermelho, empedrado, quente ou você teve febre?',
     opcoes: SIM_NAO,
     quando: (r) => r.dor === 'sim',
@@ -126,8 +177,11 @@ export const PERGUNTAS: Pergunta[] = [
       r.mastite === 'sim'
         ? {
             tom: 'urgente',
-            titulo: 'Esses podem ser sinais de mastite',
-            texto: 'Se você tiver febre, calafrios ou se sentir mal, procure atendimento médico hoje. Continue amamentando ou esvaziando esse peito: isso ajuda na recuperação.',
+            selo: 'ATENÇÃO: SINAL DE MASTITE!',
+            icone: 'urgente',
+            titulo: 'Seu peito está pedindo socorro',
+            texto: 'Peito vermelho, empedrado e quente pode ser mastite. Se você tiver febre, calafrios ou se sentir mal, procure atendimento médico hoje.',
+            dica: 'Não pare de amamentar nesse peito. Esvaziar o peito ajuda na recuperação.',
           }
         : null,
   },
@@ -135,6 +189,7 @@ export const PERGUNTAS: Pergunta[] = [
   // Os dois ramos
   {
     id: 'peso',
+    icone: 'balanca',
     texto: 'O seu bebê está ganhando peso?',
     ajuda: 'Pense na última consulta com o pediatra ou na última pesagem.',
     opcoes: [
@@ -142,19 +197,13 @@ export const PERGUNTAS: Pergunta[] = [
       { valor: 'nao', texto: 'Não, está ganhando pouco ou perdeu peso' },
       { valor: 'nao_sei', texto: 'Não sei' },
     ],
-    alerta: (r) =>
-      r.peso === 'nao'
-        ? {
-            tom: 'urgente',
-            titulo: 'Esse é um sinal fortíssimo',
-            texto: 'Quando o bebê não ganha peso, é sinal fortíssimo de que ele não está extraindo leite suficiente — e a causa mais comum é a pega. Converse com o pediatra o quanto antes.',
-          }
-        : null,
+    alerta: (r) => (r.peso === 'nao' ? ALERTA_PESO : null),
   },
 
   // Ramo SEM dor: entender a queixa
   {
     id: 'tempo',
+    icone: 'relogio',
     texto: 'Como costumam ser as mamadas do seu bebê?',
     quando: (r) => r.dor === 'nao' && r.peso !== 'nao',
     opcoes: [
@@ -162,9 +211,24 @@ export const PERGUNTAS: Pergunta[] = [
       { valor: 'longa', texto: 'Muito longas: fica quase uma hora no peito e logo quer de novo' },
       { valor: 'normal', texto: 'Ele mama, solta sozinho e fica satisfeito' },
     ],
+    alerta: (r) =>
+      r.tempo === 'curta' || r.tempo === 'longa'
+        ? {
+            tom: 'alerta',
+            selo: 'FIQUE DE OLHO!',
+            icone: 'aviso',
+            titulo: r.tempo === 'curta' ? 'Mamada curta demais pode ser cansaço' : 'Mamada sem fim pode ser leite que não sai',
+            texto:
+              r.tempo === 'curta'
+                ? 'Quando a pega não está boa, o bebê faz muita força para pouco leite, cansa e dorme antes de ficar satisfeito.'
+                : 'Bebê que fica muito tempo no peito e logo quer de novo muitas vezes está se esforçando, mas não consegue extrair o leite de que precisa.',
+            dica: 'Repare se dá para ouvir o bebê engolindo durante a mamada. É um bom sinal de que o leite está saindo.',
+          }
+        : null,
   },
   {
     id: 'fraldas',
+    icone: 'fralda',
     texto: 'O seu bebê molha 6 fraldas ou mais por dia?',
     ajuda: 'Vale para bebês com mais de 5 dias de vida.',
     quando: (r) => r.dor === 'nao',
@@ -198,8 +262,15 @@ export function resultadoPara(r: Resposta): SlugResultado {
   return 'sem-dor-sinais-de-alerta';
 }
 
+export type Sinal = { texto: string; ok: boolean };
+
 export type Resultado = {
+  tom: Tom;
+  selo: string;
+  icone: Icone;
   titulo: string;
+  /** Checklist "Seus sinais": vermelho = problema, verde = ok. */
+  sinais: Sinal[];
   /** "O que as suas respostas mostram" — o diagnóstico em si. */
   diagnostico: string[];
   /** "O que eu indico para você primeiro". */
@@ -207,13 +278,18 @@ export type Resultado = {
   produtos: ChaveProduto[];
   /** Aviso extra que aparece em destaque (ex.: procurar médico). */
   aviso?: string;
-  tom: 'alerta' | 'urgente' | 'tranquilo';
 };
 
 export const RESULTADOS: Record<SlugResultado, Resultado> = {
   'dor-com-mastite': {
     tom: 'urgente',
-    titulo: 'Seu peito está pedindo socorro — e a pega precisa ser ajustada',
+    selo: 'DIAGNÓSTICO: PEGA ERRADA + SINAL DE MASTITE',
+    icone: 'urgente',
+    titulo: 'Seu peito está pedindo socorro, e a pega precisa ser ajustada',
+    sinais: [
+      { texto: 'Dor para amamentar', ok: false },
+      { texto: 'Peito vermelho, empedrado ou quente', ok: false },
+    ],
     diagnostico: [
       'Você sente dor para amamentar: é muito provável que o seu bebê esteja mamando com a pega errada.',
       'Peito vermelho, empedrado ou quente são sinais de inflamação, que costuma aparecer quando o peito não está sendo bem esvaziado.',
@@ -224,27 +300,45 @@ export const RESULTADOS: Record<SlugResultado, Resultado> = {
   },
   'dor-com-fissura': {
     tom: 'alerta',
+    selo: 'DIAGNÓSTICO: PEGA ERRADA',
+    icone: 'aviso',
     titulo: 'A fissura é o recado: a pega do seu bebê está errada',
+    sinais: [
+      { texto: 'Dor para amamentar', ok: false },
+      { texto: 'Fissura no bico do peito', ok: false },
+    ],
     diagnostico: [
       'Você sente dor para amamentar e está com fissura no bico do peito.',
       'Fissura quase sempre acontece porque o bebê pega só o bico, e não a aréola. Enquanto a pega não for corrigida, o machucado volta.',
     ],
-    indicacao: 'O que você precisa primeiro é do Protocolo Pega Perfeita, para o seu bebê mamar certo. E para agilizar: com o SOS Fissura o seu peito cicatriza mais rápido enquanto você ajusta a pega — por apenas R$ 20.',
+    indicacao: 'O que você precisa primeiro é do Protocolo Pega Perfeita, para o seu bebê mamar certo. E para agilizar: com o SOS Fissura o seu peito cicatriza mais rápido enquanto você ajusta a pega, por apenas R$ 20.',
     produtos: ['pegaPerfeita', 'sosFissura'],
   },
   'dor-pega-errada': {
     tom: 'alerta',
-    titulo: 'Diagnóstico: é muito provável que o seu bebê esteja mamando errado',
+    selo: 'DIAGNÓSTICO: PEGA ERRADA',
+    icone: 'aviso',
+    titulo: 'É muito provável que o seu bebê esteja mamando errado',
+    sinais: [
+      { texto: 'Dor para amamentar', ok: false },
+      { texto: 'Sem fissura (por enquanto)', ok: true },
+    ],
     diagnostico: [
       'Amamentar pode ser desconfortável nos primeiros segundos, mas dor durante a mamada não é normal.',
-      'Dor é o sinal mais comum de pega incorreta — e, se nada mudar, ela costuma evoluir para fissura.',
+      'Dor é o sinal mais comum de pega incorreta. Se nada mudar, ela costuma evoluir para fissura.',
     ],
     indicacao: 'Eu indico para você, primeiro, o Protocolo Pega Perfeita. Lá você aprende a posicionar o bebê e a corrigir a pega para amamentar sem dor.',
     produtos: ['pegaPerfeita', 'sosFissura'],
   },
   'sem-dor-sem-peso': {
     tom: 'urgente',
+    selo: 'DIAGNÓSTICO: LEITE INSUFICIENTE',
+    icone: 'urgente',
     titulo: 'Seu bebê pode não estar extraindo leite suficiente',
+    sinais: [
+      { texto: 'Sem dor para amamentar', ok: true },
+      { texto: 'Bebê não está ganhando peso', ok: false },
+    ],
     diagnostico: [
       'Não sentir dor é ótimo, mas não garante que a pega esteja certa.',
       'Se o bebê não está ganhando peso, é sinal fortíssimo de que ele não está conseguindo extrair leite suficiente do peito. Muitas vezes ele mama, mas a pega é rasa e o leite não sai na quantidade de que ele precisa.',
@@ -255,7 +349,13 @@ export const RESULTADOS: Record<SlugResultado, Resultado> = {
   },
   'sem-dor-sinais-de-alerta': {
     tom: 'alerta',
+    selo: 'DIAGNÓSTICO: MAMADA QUE NÃO RENDE',
+    icone: 'aviso',
     titulo: 'Sem dor, mas com sinais de que a mamada não está rendendo',
+    sinais: [
+      { texto: 'Sem dor para amamentar', ok: true },
+      { texto: 'Mamadas, fraldas ou peso fora do esperado', ok: false },
+    ],
     diagnostico: [
       'Você não sente dor, o que é um bom sinal. Mas algumas respostas chamaram a atenção: mamadas muito curtas ou muito longas, poucas fraldas molhadas ou não saber se ele está ganhando peso.',
       'Esses são sinais clássicos de transferência de leite ineficiente: o bebê fica no peito, mas não consegue tirar o leite de que precisa.',
@@ -265,13 +365,21 @@ export const RESULTADOS: Record<SlugResultado, Resultado> = {
     aviso: 'Se você não sabe se o seu bebê está ganhando peso, peça para pesá-lo na próxima consulta com o pediatra.',
   },
   'tudo-certo': {
-    tom: 'tranquilo',
+    tom: 'bom',
+    selo: 'RESULTADO: TUDO CERTO!',
+    icone: 'ok',
     titulo: 'Mamãe, pode ficar tranquila',
+    sinais: [
+      { texto: 'Sem dor para amamentar', ok: true },
+      { texto: 'Bebê ganhando peso', ok: true },
+      { texto: 'Mamadas tranquilas', ok: true },
+      { texto: '6 fraldas molhadas ou mais por dia', ok: true },
+    ],
     diagnostico: [
       'Pela nossa pré-análise, é muito provável que o seu bebê esteja com uma pega correta e uma boa transferência de leite.',
-      'Você não sente dor, ele está ganhando peso, molha fraldas suficientes e sai satisfeito das mamadas: esses são os principais sinais de uma amamentação que está dando certo.',
+      'Esses são os principais sinais de uma amamentação que está dando certo. Parabéns!',
     ],
-    indicacao: 'Continue acompanhando com o pediatra. E, para ter tudo anotado — mamadas, fraldas e peso —, use o meu aplicativo gratuito.',
+    indicacao: 'Continue acompanhando com o pediatra. E, para ter tudo anotado (mamadas, fraldas e peso), use o meu aplicativo gratuito.',
     produtos: ['aplicativo'],
   },
 };

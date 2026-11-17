@@ -1,13 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { MARCA, PERGUNTAS, resultadoPara, type Alerta, type Resposta } from '@/lib/quiz/conteudo';
+import { useState, type MouseEvent } from 'react';
+import { PERGUNTAS, resultadoPara, type Alerta, type Resposta } from '@/lib/quiz/conteudo';
+import { telaAlerta, telaInicio, telaPergunta } from '@/lib/quiz/telas';
 
 type Tela =
   | { tipo: 'inicio' }
   | { tipo: 'pergunta'; indice: number }
-  | { tipo: 'alerta'; alerta: Alerta; proximo: number };
+  | { tipo: 'alerta'; alerta: Alerta; depoisDe: number };
 
 function proximaPergunta(depoisDe: number, r: Resposta): number {
   for (let i = depoisDe + 1; i < PERGUNTAS.length; i++) {
@@ -31,76 +32,42 @@ export function Quiz() {
 
   function avancar(depoisDe: number, r: Resposta) {
     const prox = proximaPergunta(depoisDe, r);
-    if (prox === -1) {
-      router.push(`/quiz/resultado/${resultadoPara(r)}`);
-      return;
+    if (prox === -1) router.push(`/quiz/resultado/${resultadoPara(r)}`);
+    else ir({ tipo: 'pergunta', indice: prox });
+  }
+
+  function clique(e: MouseEvent<HTMLDivElement>) {
+    const botao = (e.target as HTMLElement).closest<HTMLElement>('[data-acao]');
+    if (!botao) return;
+    const acao = botao.dataset.acao;
+
+    if (acao === 'comecar') ir({ tipo: 'pergunta', indice: 0 });
+    if (acao === 'continuar' && tela.tipo === 'alerta') avancar(tela.depoisDe, respostas);
+    if (acao === 'voltar') {
+      const anterior = historico[historico.length - 1];
+      if (anterior) {
+        setTela(anterior);
+        setHistorico(historico.slice(0, -1));
+      }
     }
-    ir({ tipo: 'pergunta', indice: prox });
+    if (acao === 'responder' && tela.tipo === 'pergunta') {
+      const q = PERGUNTAS[tela.indice];
+      const r = { ...respostas, [q.id]: botao.dataset.valor ?? '' };
+      setRespostas(r);
+      const alerta = q.alerta?.(r);
+      if (alerta) ir({ tipo: 'alerta', alerta, depoisDe: tela.indice });
+      else avancar(tela.indice, r);
+    }
   }
 
-  function responder(indice: number, valor: string) {
-    const q = PERGUNTAS[indice];
-    const r = { ...respostas, [q.id]: valor };
-    setRespostas(r);
-    const alerta = q.alerta?.(r);
-    if (alerta) ir({ tipo: 'alerta', alerta, proximo: indice });
-    else avancar(indice, r);
+  let html: string;
+  if (tela.tipo === 'inicio') html = telaInicio();
+  else if (tela.tipo === 'alerta') html = telaAlerta(tela.alerta);
+  else {
+    const passo = historico.filter((t) => t.tipo === 'pergunta').length + 1;
+    html = telaPergunta(PERGUNTAS[tela.indice], passo, historico.length > 1);
   }
 
-  function voltar() {
-    setHistorico((h) => {
-      const anterior = h[h.length - 1];
-      if (anterior) setTela(anterior);
-      return h.slice(0, -1);
-    });
-  }
-
-  if (tela.tipo === 'inicio') {
-    return (
-      <section className="quiz-cartao quiz-inicio">
-        <p className="quiz-selo">Teste gratuito · 1 minuto</p>
-        <h1>O seu bebê está mamando do jeito certo?</h1>
-        <p className="quiz-texto">{MARCA.chamada}</p>
-        <button className="quiz-botao" onClick={() => ir({ tipo: 'pergunta', indice: 0 })}>
-          Clique para fazer o diagnóstico gratuito
-        </button>
-      </section>
-    );
-  }
-
-  if (tela.tipo === 'alerta') {
-    return (
-      <section className={`quiz-cartao quiz-alerta quiz-tom-${tela.alerta.tom}`}>
-        <p className="quiz-selo">{tela.alerta.tom === 'urgente' ? 'Importante' : 'Alerta'}</p>
-        <h2>{tela.alerta.titulo}</h2>
-        <p className="quiz-texto">{tela.alerta.texto}</p>
-        <button className="quiz-botao" onClick={() => avancar(tela.proximo, respostas)}>
-          Continuar
-        </button>
-        <button className="quiz-voltar" onClick={voltar}>← Voltar</button>
-      </section>
-    );
-  }
-
-  const q = PERGUNTAS[tela.indice];
-  const passo = historico.filter((t) => t.tipo === 'pergunta').length + 1;
-  // O total depende do caminho; 5 é o caminho mais longo.
-  const progresso = Math.min(100, Math.round((passo / 5) * 100));
-
-  return (
-    <section className="quiz-cartao" key={q.id}>
-      <div className="quiz-progresso" aria-hidden="true"><span style={{ width: `${progresso}%` }} /></div>
-      <p className="quiz-selo">Pergunta {passo}</p>
-      <h2>{q.texto}</h2>
-      {q.ajuda && <p className="quiz-ajuda">{q.ajuda}</p>}
-      <div className="quiz-opcoes">
-        {q.opcoes.map((o) => (
-          <button key={o.valor} className="quiz-opcao" onClick={() => responder(tela.indice, o.valor)}>
-            {o.texto}
-          </button>
-        ))}
-      </div>
-      {historico.length > 1 && <button className="quiz-voltar" onClick={voltar}>← Voltar</button>}
-    </section>
-  );
+  // `key` faz a animação de entrada rodar a cada tela nova.
+  return <div key={historico.length} onClick={clique} dangerouslySetInnerHTML={{ __html: html }} />;
 }
