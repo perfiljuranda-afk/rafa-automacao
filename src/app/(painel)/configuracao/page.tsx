@@ -4,6 +4,7 @@ import { WEBHOOK_FIELDS } from '@/lib/meta/subscribe';
 import {
   credencialPresente,
   estadoDaIntegracao,
+  fraseDeTudoConfigurado,
   integracoesDoPainel,
   type EstadoDaIntegracao,
   type IdDaIntegracao,
@@ -188,9 +189,7 @@ export default async function ConfiguracaoPage() {
         descricao="O que está ligado nesta cópia e o que deixa de funcionar quando falta."
       >
         {tudoConfigurado ? (
-          <Vazio compacto>
-            Todas as integrações desta instalação estão configuradas.
-          </Vazio>
+          <Vazio compacto>{fraseDeTudoConfigurado(TEM_ATENDIMENTO)}</Vazio>
         ) : (
           <div className="grid gap-3">
             {estados.map(({ integracao, estado }) => (

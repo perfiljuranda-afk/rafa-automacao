@@ -38,7 +38,10 @@ const {
   refreshLongLived: vi.fn(),
   garantirInscricao: vi.fn(),
   camposQueFaltam: vi.fn(),
-  assinaturaDoAplicativo: vi.fn(),
+  // Tipado de proposito: mock sem tipo aceita qualquer formato, e foi assim que
+  // este arquivo afirmou por semanas um `{ ok, motivo }` que a funcao nunca
+  // devolveu. Com o tipo, formato errado nao passa do tsc.
+  assinaturaDoAplicativo: vi.fn<typeof import('../src/lib/meta/subscribe').assinaturaDoAplicativo>(),
   requirePanelSession: vi.fn(),
   listDeliveries: vi.fn(),
   listRecentEvents: vi.fn(),
@@ -88,7 +91,7 @@ beforeEach(() => {
   refreshLongLived.mockReset();
   garantirInscricao.mockReset().mockResolvedValue(EM_ORDEM);
   camposQueFaltam.mockReset().mockReturnValue([]);
-  assinaturaDoAplicativo.mockReset().mockResolvedValue({ ok: false, motivo: 'sem-credencial' });
+  assinaturaDoAplicativo.mockReset().mockResolvedValue({ estado: 'sem-credencial' });
   requirePanelSession.mockReset().mockResolvedValue(undefined);
   listDeliveries.mockReset().mockResolvedValue([]);
   listRecentEvents.mockReset().mockResolvedValue([]);

@@ -10,7 +10,12 @@ import { diagnosticarPessoa } from '@/lib/repo/diagnostico';
 import { listDeliveries } from '@/lib/repo/deliveries';
 import { listRecentEvents, recebimentoPorTipo } from '@/lib/repo/webhook-events';
 import { resumirEntrega } from '@/lib/painel/resumo-da-entrega';
-import { assinaturaDoAplicativo, camposQueFaltam, garantirInscricao } from '@/lib/meta/subscribe';
+import {
+  assinaturaDoAplicativo,
+  camposQueFaltam,
+  garantirInscricao,
+  type LeituraDaAssinatura,
+} from '@/lib/meta/subscribe';
 import { hostDoDialeto } from '@/lib/meta/dialeto';
 import { getFirstAccount } from '@/lib/repo/accounts';
 import { NOME_DO_CAMPO } from '@/lib/painel/campos-do-webhook';
@@ -117,11 +122,11 @@ export default async function LogsPage({
     recebimento && recebimento.comentarios >= 3 && recebimento.entrada === 0,
   );
 
-  const assinatura = await assinaturaDoAplicativo(
+  const leitura = await assinaturaDoAplicativo(
     process.env.IG_APP_ID ?? '',
     process.env.IG_APP_SECRET ?? '',
-  ).catch(() => null);
-  const faltandoNoApp = assinatura ? camposQueFaltam(assinatura.campos) : [];
+  ).catch((): LeituraDaAssinatura => ({ estado: 'nao-perguntei' }));
+  const faltandoNoApp = leitura.estado === 'ok' ? camposQueFaltam(leitura.assinatura.campos) : [];
 
   const temInteracao = Boolean(
     diagnostico && (diagnostico.webhooks.total > 0 || diagnostico.eventos.total > 0),
@@ -300,12 +305,28 @@ export default async function LogsPage({
                 dois estão em toda instalação. Agora a tela lê em vez de mandar
                 o leitor conferir à mão.
               */}
-              {assinatura === null ? (
+              {leitura.estado === 'sem-credencial' ? (
                 <p className="mt-4 text-sm text-tinta-media">
-                  Não consegui ler o que o <strong>aplicativo</strong> está assinado
-                  para receber. Confira em Webhooks, na seção do Instagram, no portal
-                  da Meta: conta inscrita e aplicativo sem campo marcado dá silêncio
-                  aqui embaixo, com tudo parecendo certo em cima.
+                  Não consegui perguntar: falta no ambiente a identificação ou a chave
+                  secreta do aplicativo (<code>IG_APP_ID</code> e{' '}
+                  <code>IG_APP_SECRET</code>). Sem as duas eu não tenho como ler esta
+                  metade — o resto do painel funciona, e isto aqui fica cego.
+                </p>
+              ) : leitura.estado === 'nao-perguntei' ? (
+                <p className="mt-4 text-sm text-tinta-media">
+                  A Meta recusou a pergunta, então não é campo desmarcado no portal:
+                  é o <strong>par</strong>. O painel usa a identificação e a chave
+                  secreta do aplicativo <strong>juntas</strong>, e a Meta recusa o
+                  conjunto quando uma veio de uma tela do app e a outra de outra.
+                  Confira na Vercel se as duas saíram da mesma tela. Se estiverem
+                  certas, pode ter sido a Meta fora do ar: recarregue daqui a pouco.
+                </p>
+              ) : leitura.estado === 'sem-inscricao' ? (
+                <p className="mt-4 text-sm text-tinta-media">
+                  Perguntei, e o <strong>aplicativo</strong> não tem inscrição do
+                  Instagram. Confira em Webhooks, na seção do Instagram, no portal da
+                  Meta: conta inscrita e aplicativo sem campo marcado dá silêncio aqui
+                  embaixo, com tudo parecendo certo em cima.
                 </p>
               ) : faltandoNoApp.length > 0 ? (
                 <div className="mt-4 text-sm">
@@ -324,7 +345,11 @@ export default async function LogsPage({
                 <p className="mt-4 text-sm text-tinta-media">
                   O aplicativo está assinado em todos os avisos que o painel usa, e
                   entrega em{' '}
-                  <span className="break-all">{assinatura.callbackUrl ?? 'nenhum endereço'}</span>.
+                  <span className="break-all">
+                    {leitura.estado === 'ok'
+                      ? leitura.assinatura.callbackUrl ?? 'nenhum endereço'
+                      : 'nenhum endereço'}
+                  </span>.
                 </p>
               )}
               {faltando.length > 0 && (

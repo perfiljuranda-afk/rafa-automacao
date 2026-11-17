@@ -1,4 +1,4 @@
 {
-  "versao": "2026-11-16T13:53",
-  "novidades": "Ao atualizar pelo comando, o Atendimento pode ser ligado na mesma hora, e as conversas do Instagram e do WhatsApp passam a aparecer dentro do painel. Quem tem o Radar vê em Configurações, na Saúde da instalação, se o Atendimento está ligado."
+  "versao": "2026-11-17T15:19",
+  "novidades": "Em Configurações, na Saúde da instalação, a frase que aparece quando nada falta passa a dizer \"inclusive o Atendimento\". Em Logs, quando não dá para ler o que o aplicativo está assinado para receber, a tela passa a dizer qual é o caso — falta o par da Meta no projeto, a Meta recusou o par, ou o aplicativo está sem inscrição — em vez de mandar conferir o portal nos três. E quem tem o Disparador: em Campanhas de WhatsApp, cada mensagem que não saiu diz se continua na fila ou se não sai mais, e avisa quando o corte foi o limite de envio da Meta, que não é defeito do painel."
 }

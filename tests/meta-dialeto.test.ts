@@ -149,22 +149,44 @@ describe('o que o aplicativo está assinado para receber', () => {
     });
     vi.stubGlobal('fetch', buscar);
 
-    const assinatura = await assinaturaDoAplicativo('123', 'segredo');
-    expect(assinatura).toEqual({
-      callbackUrl: 'https://painel.exemplo/api/webhook',
-      ativa: true,
-      campos: ['comments', 'messages'],
+    const leitura = await assinaturaDoAplicativo('123', 'segredo');
+    expect(leitura).toEqual({
+      estado: 'ok',
+      assinatura: {
+        callbackUrl: 'https://painel.exemplo/api/webhook',
+        ativa: true,
+        campos: ['comments', 'messages'],
+      },
     });
-    expect(camposQueFaltam(assinatura!.campos)).toEqual([
+    expect(camposQueFaltam(leitura.estado === 'ok' ? leitura.assinatura.campos : [])).toEqual([
       'messaging_postbacks', 'messaging_seen', 'live_comments',
     ]);
     // O token do aplicativo é o id e o segredo juntos, e vai codificado.
     expect(buscar.mock.calls[0][0]).toContain('123%7Csegredo');
   });
 
-  it('aplicativo sem assinatura nenhuma devolve nulo, e não lista vazia', async () => {
+  /*
+   * Tres motivos, tres respostas. Antes os tres eram `null` e a tela mandava
+   * todo mundo conferir campo marcado no portal da Meta -- inclusive quem nao
+   * tinha o par no ambiente e quem tinha o par misturado, que nao se conserta
+   * no portal.
+   */
+  it('aplicativo sem assinatura nenhuma diz que perguntou, e não lista vazia', async () => {
     vi.stubGlobal('fetch', responder({ '/subscriptions': { data: [] } }));
-    expect(await assinaturaDoAplicativo('123', 'segredo')).toBeNull();
+    expect(await assinaturaDoAplicativo('123', 'segredo')).toEqual({ estado: 'sem-inscricao' });
+  });
+
+  it('sem o par no ambiente não pergunta nada à Meta', async () => {
+    const buscar = responder({ '/subscriptions': { data: [] } });
+    vi.stubGlobal('fetch', buscar);
+    expect(await assinaturaDoAplicativo('', 'segredo')).toEqual({ estado: 'sem-credencial' });
+    expect(await assinaturaDoAplicativo('123', '   ')).toEqual({ estado: 'sem-credencial' });
+    expect(buscar).not.toHaveBeenCalled();
+  });
+
+  it('recusa da Meta é "não perguntei", que é o caso do par misturado', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('400 com a requisição dentro')));
+    expect(await assinaturaDoAplicativo('123', 'segredo')).toEqual({ estado: 'nao-perguntei' });
   });
 });
 

@@ -93,6 +93,23 @@ export function integracoesDoPainel(
   return temAtendimento ? [...INTEGRACOES, ATENDIMENTO] : INTEGRACOES;
 }
 
+/**
+ * A frase do caso bom, e por que ela precisa nomear o Atendimento.
+ *
+ * Com tudo configurado, a tela troca a lista por uma frase só — e aí o nome
+ * `Atendimento` desaparece exatamente de quem o tem ligado. Quem conduz o
+ * suporte pergunta o que está escrito ao lado de Atendimento, a compradora
+ * responde que não tem essa linha, e isso soa como falta quando é o contrário.
+ * Acontece com quem está com tudo em ordem, que é o perfil de quem vende.
+ *
+ * `temAtendimento` é o mesmo de `integracoesDoPainel`, e pela mesma razão: a
+ * frase não pode citar o que esta cópia não tem.
+ */
+export function fraseDeTudoConfigurado(temAtendimento: boolean): string {
+  const base = 'Todas as integrações desta instalação estão configuradas';
+  return temAtendimento ? `${base}, inclusive o ${ATENDIMENTO.nome}.` : `${base}.`;
+}
+
 export function estadoDaIntegracao(
   integracao: Integracao,
   presente: boolean,

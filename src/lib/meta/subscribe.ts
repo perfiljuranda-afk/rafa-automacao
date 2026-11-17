@@ -144,21 +144,52 @@ export type AssinaturaDoAplicativo = {
  * `graph.facebook.com`: a assinatura é do aplicativo, não da conta, e mora lá
  * nos dois dialetos.
  */
+/**
+ * Por que a leitura nao deu, quando nao da.
+ *
+ * Antes isto era `null` para tudo, e a tela mandava a pessoa conferir os
+ * campos marcados no portal da Meta. So que `null` significava tres coisas
+ * diferentes, e duas delas nao tem nada a ver com o portal:
+ *
+ * - `sem-credencial`: o par nao esta no ambiente. Nada foi perguntado.
+ * - `nao-perguntei`: a Meta recusou o pedido. O caso que a gente achou em
+ *   16/11/2026 e o par **misturado** -- identificacao de uma tela do app e
+ *   chave secreta de outra. O painel usa as duas juntas como token do
+ *   aplicativo (`id|segredo`), e a Meta recusa o conjunto. Mandar essa pessoa
+ *   marcar campo no portal e manda-la consertar o que nao esta quebrado.
+ * - `sem-inscricao`: perguntei, a Meta respondeu, e o aplicativo nao tem
+ *   inscricao do Instagram. Este sim e portal.
+ */
+export type LeituraDaAssinatura =
+  | { estado: 'ok'; assinatura: AssinaturaDoAplicativo }
+  | { estado: 'sem-credencial' }
+  | { estado: 'nao-perguntei' }
+  | { estado: 'sem-inscricao' };
+
 export async function assinaturaDoAplicativo(
   appId: string,
   appSecret: string,
-): Promise<AssinaturaDoAplicativo | null> {
-  const bruto = await metaGet(
-    `/${GRAPH_VERSION}/${appId}/subscriptions`,
-    { access_token: `${appId}|${appSecret}` },
-    GRAPH_UNIFICADO,
-  );
+): Promise<LeituraDaAssinatura> {
+  if (appId.trim() === '' || appSecret.trim() === '') return { estado: 'sem-credencial' };
+
+  let bruto: unknown;
+  try {
+    bruto = await metaGet(
+      `/${GRAPH_VERSION}/${appId}/subscriptions`,
+      { access_token: `${appId}|${appSecret}` },
+      GRAPH_UNIFICADO,
+    );
+  } catch {
+    // A excecao pode carregar a requisicao, e a requisicao carrega o segredo.
+    return { estado: 'nao-perguntei' };
+  }
+
   const dados = (bruto as { data?: unknown })?.data;
-  if (!Array.isArray(dados)) return null;
+  if (!Array.isArray(dados)) return { estado: 'nao-perguntei' };
   const instagram = dados.find(
     (item) => (item as { object?: unknown })?.object === 'instagram',
   ) as { callback_url?: unknown; active?: unknown; fields?: unknown } | undefined;
-  if (!instagram) return null;
+  if (!instagram) return { estado: 'sem-inscricao' };
   const campos = Array.isArray(instagram.fields)
     ? instagram.fields.flatMap((campo) => {
         const nome = (campo as { name?: unknown })?.name;
@@ -166,8 +197,11 @@ export async function assinaturaDoAplicativo(
       })
     : [];
   return {
-    callbackUrl: typeof instagram.callback_url === 'string' ? instagram.callback_url : null,
-    ativa: instagram.active === true,
-    campos,
+    estado: 'ok',
+    assinatura: {
+      callbackUrl: typeof instagram.callback_url === 'string' ? instagram.callback_url : null,
+      ativa: instagram.active === true,
+      campos,
+    },
   };
 }
