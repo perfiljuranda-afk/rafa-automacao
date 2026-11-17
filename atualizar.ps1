@@ -111,6 +111,66 @@ function TentarApi($metodo, $url, $cabecalhos, $corpo) {
   } catch { return $null }
 }
 
+# "Ja existe" dito pela Vercel, nas duas redacoes que ela usa.
+#
+# A documentacao do endpoint da a mensagem do 403 ("...because it already
+# exists") e nao da o codigo; codigo da Vercel para esse caso tem a forma
+# ENV_ALREADY_EXISTS. As duas passam por aqui. `-match` e sem diferenca entre
+# maiuscula e minuscula no PowerShell, de proposito.
+function JaExistia($texto) {
+  return ($texto -match 'already[ _]exists')
+}
+
+# Grava uma variavel SEM passar por cima do que ja estiver la.
+#
+# Devolve 'gravada', 'ja existia' ou 'falhou: <o que a Vercel respondeu>'.
+#
+# Por que nao `upsert=true` aqui: a leitura das variaveis do projeto volta
+# VAZIA quando a ligacao com a Vercel foi criada com a chavinha "Sensitive"
+# ligada -- medido em 13/11/2026, e esta escrito em
+# docs/atualizacao-pelo-atendente.md. Nessa instalacao o comando pergunta do
+# WhatsApp para quem ja tem WhatsApp funcionando, recebe uma chave digitada de
+# novo, e com upsert gravaria por cima. A WHATSAPP_APP_SECRET e conferida em
+# TODA entrega: um valor diferente do que a Meta assina faz a rota responder
+# 401 e descartar a mensagem na hora, sem aviso em tela nenhuma. Entre gravar
+# e nao gravar, aqui nao se grava: o valor que ja esta la e o que a Meta ja
+# aceitou. A WHATSAPP_VERIFY_TOKEN pelo mesmo motivo com atraso -- trocar a de
+# quem ja validou o webhook so quebra na proxima vez que alguem salvar o
+# webhook no portal, longe da causa.
+#
+# A recusa chega de duas formas, e as duas sao a mesma coisa: a Vercel pode
+# responder 403, que vira excecao aqui, ou responder 201 com o item dentro de
+# `failed`. Ler so a excecao deixaria a segunda passar como sucesso -- e
+# "passou como sucesso" aqui quer dizer dizer a ela que guardou uma chave que
+# nao guardou.
+function GravarSemSobrescrever($cabecalhos, $projetoId, $chave, $valor) {
+  $parametros = @{
+    Method      = 'POST'
+    Uri         = "https://api.vercel.com/v10/projects/$projetoId/env"
+    Headers     = $cabecalhos
+    ContentType = 'application/json'
+    ErrorAction = 'Stop'
+    Body        = (ConvertTo-Json -InputObject @{
+      key = $chave; value = $valor; type = 'encrypted'; target = @('production')
+    } -Depth 10 -Compress)
+  }
+  try {
+    $resposta = Invoke-RestMethod @parametros
+  } catch {
+    $texto = $_.ErrorDetails.Message
+    if (-not $texto) { $texto = $_.Exception.Message }
+    if (JaExistia $texto) { return 'ja existia' }
+    return "falhou: $texto"
+  }
+  $recusas = @($resposta.failed)
+  if ($recusas.Count -gt 0) {
+    $texto = ($recusas | ForEach-Object { "$($_.error.code) $($_.error.message)" }) -join ' '
+    if (JaExistia $texto) { return 'ja existia' }
+    return "falhou: $texto"
+  }
+  return 'gravada'
+}
+
 # Traz os arquivos do modelo para dentro da copia que ja existe.
 #
 # Ate 14/10/2026 nao havia este caminho: quem ja estava no Radar e rodava o
@@ -282,15 +342,23 @@ $projeto = $lista[$indice - 1]
 Passo "escolhido: $($projeto.name)"
 
 <#
-  O Atendimento, ligado aqui e nao a mao.
+  O Atendimento vem ligado, e nao se pergunta.
 
   Ate 16/11/2026 o comando trazia o codigo do Atendimento e parava ai: a tela
   so aparecia depois de a pessoa criar RADAR_INBOX_ENABLED na Vercel e fazer
   Redeploy. Dois passos tecnicos no meio de um caminho que existe justamente
   para nao ter nenhum, e o segundo deles e o que mais some.
 
-  As perguntas ficam ANTES da confirmacao, de proposito: depois do SIM o
-  comando nao pede mais nada, e quem saiu de perto encontra tudo pronto.
+  Entao passou a ligar, perguntando. A pergunta tambem saiu, em 17/11/2026:
+  para responder, ela precisava saber o que e o Atendimento antes de ter visto
+  a tela, e quem respondia "nao" terminava com um painel pela metade, sem como
+  ligar depois a nao ser pelo portal da Vercel. Ligar nao tem risco: nao mexe
+  nas automacoes, nao apaga nada, e o que ja estava no ar segue igual.
+
+  O WhatsApp continua sendo escolha dela, porque depende de dois valores que
+  ela pode nem ter em maos agora. Essa pergunta fica ANTES da confirmacao, de
+  proposito: depois do SIM o comando nao pede mais nada, e quem saiu de perto
+  encontra tudo pronto.
 #>
 Titulo "O Atendimento"
 Passo "As conversas do Instagram e do WhatsApp dentro do painel: quem falou"
@@ -304,52 +372,52 @@ foreach ($e in @($envDeAgora.envs)) {
 }
 
 $novasVariaveis = @{}
-$vouLigar = $false
 # O guia avisa que espaco sobrando na Vercel mostra a chave ligada e deixa o
 # painel desligado. Aqui o espaco nao chega: o valor sai escrito do script.
 $jaLigado = (($gravadas['RADAR_INBOX_ENABLED'] + '').Trim() -eq 'true')
+# "Vou ligar nesta atualizacao", que nao e o mesmo que "vai ficar ligado":
+# quem ja estava ligado nao precisa ler que algo mudou.
+$vouLigar = -not $jaLigado
 
 if ($jaLigado) {
   Passo "ja esta ligado no seu painel"
 } else {
-  $vouLigar = PerguntaSimNao "Quer ligar o Atendimento agora?"
-  if ($vouLigar) { $novasVariaveis['RADAR_INBOX_ENABLED'] = 'true' }
+  $novasVariaveis['RADAR_INBOX_ENABLED'] = 'true'
+  Passo "esta atualizacao liga, e a aba aparece no menu quando ela terminar"
 }
 
 $palavraDoWhatsapp = ''
 $faltaOPortal = $false
-if ($jaLigado -or $vouLigar) {
-  if ($gravadas.ContainsKey('WHATSAPP_APP_SECRET') -and $gravadas.ContainsKey('WHATSAPP_VERIFY_TOKEN')) {
-    Passo "o WhatsApp ja esta pronto para receber"
-  } else {
-    Passo ""
-    Passo "O Instagram usa o mesmo endereco que ja recebe os comentarios, e"
-    Passo "nao precisa de nada novo. O WhatsApp precisa de dois valores."
-    if (PerguntaSimNao "Voce usa o WhatsApp no painel?") {
-      Passo "A chave secreta esta no portal da Meta, no aplicativo que tem o"
-      Passo "produto WhatsApp: Configuracoes do app, Basico, botao Mostrar."
-      Passo "Tem que ser a do aplicativo do WhatsApp. Com a de outro, a Meta"
-      Passo "entrega e o painel recusa toda mensagem, sem aviso em tela nenhuma."
-      Passo "O texto colado nao aparece na tela."
-      $chaveDoApp = ''
-      if (-not $gravadas.ContainsKey('WHATSAPP_APP_SECRET')) {
-        $chaveDoApp = PerguntaSecreta "Chave secreta do aplicativo do WhatsApp"
-      }
-      # Enter em branco aqui nao derruba a atualizacao: o codigo novo e o
-      # Instagram seguem, e o WhatsApp fica para a proxima vez. Parar tudo por
-      # causa de um valor que ela pode nem ter em maos agora seria pior.
-      if (-not $gravadas.ContainsKey('WHATSAPP_APP_SECRET') -and -not $chaveDoApp) {
-        Passo "sem a chave secreta eu deixo o WhatsApp para depois; o resto continua"
+if ($gravadas.ContainsKey('WHATSAPP_APP_SECRET') -and $gravadas.ContainsKey('WHATSAPP_VERIFY_TOKEN')) {
+  Passo "o WhatsApp ja esta pronto para receber"
+} else {
+  Passo ""
+  Passo "O Instagram usa o mesmo endereco que ja recebe os comentarios, e"
+  Passo "nao precisa de nada novo. O WhatsApp precisa de dois valores."
+  if (PerguntaSimNao "Voce usa o WhatsApp no painel?") {
+    Passo "A chave secreta esta no portal da Meta, no aplicativo que tem o"
+    Passo "produto WhatsApp: Configuracoes do app, Basico, botao Mostrar."
+    Passo "Tem que ser a do aplicativo do WhatsApp. Com a de outro, a Meta"
+    Passo "entrega e o painel recusa toda mensagem, sem aviso em tela nenhuma."
+    Passo "O texto colado nao aparece na tela."
+    $chaveDoApp = ''
+    if (-not $gravadas.ContainsKey('WHATSAPP_APP_SECRET')) {
+      $chaveDoApp = PerguntaSecreta "Chave secreta do aplicativo do WhatsApp"
+    }
+    # Enter em branco aqui nao derruba a atualizacao: o codigo novo e o
+    # Instagram seguem, e o WhatsApp fica para a proxima vez. Parar tudo por
+    # causa de um valor que ela pode nem ter em maos agora seria pior.
+    if (-not $gravadas.ContainsKey('WHATSAPP_APP_SECRET') -and -not $chaveDoApp) {
+      Passo "sem a chave secreta eu deixo o WhatsApp para depois; o resto continua"
+    } else {
+      if ($chaveDoApp) { $novasVariaveis['WHATSAPP_APP_SECRET'] = $chaveDoApp }
+      if ($gravadas.ContainsKey('WHATSAPP_VERIFY_TOKEN')) {
+        $palavraDoWhatsapp = $gravadas['WHATSAPP_VERIFY_TOKEN']
       } else {
-        if ($chaveDoApp) { $novasVariaveis['WHATSAPP_APP_SECRET'] = $chaveDoApp }
-        if ($gravadas.ContainsKey('WHATSAPP_VERIFY_TOKEN')) {
-          $palavraDoWhatsapp = $gravadas['WHATSAPP_VERIFY_TOKEN']
-        } else {
-          $palavraDoWhatsapp = Segredo
-          $novasVariaveis['WHATSAPP_VERIFY_TOKEN'] = $palavraDoWhatsapp
-        }
-        $faltaOPortal = $true
+        $palavraDoWhatsapp = Segredo
+        $novasVariaveis['WHATSAPP_VERIFY_TOKEN'] = $palavraDoWhatsapp
       }
+      $faltaOPortal = $true
     }
   }
 }
@@ -425,13 +493,54 @@ if (-not $jaEraORadar) {
 # Antes da publicacao, e nao depois: variavel gravada depois nao vale para o
 # deploy que ja saiu, e e por isso que o caminho a mao precisa de um Redeploy
 # no fim. Aqui a publicacao ja sai com elas dentro.
-if ($novasVariaveis.Count -gt 0) {
+#
+# Os dois caminhos sao diferentes de proposito, e o motivo esta em
+# GravarSemSobrescrever: o interruptor do Atendimento pode ser gravado por
+# cima, porque `true` por cima de `true` nao muda nada; as duas do WhatsApp
+# nao podem.
+if ($novasVariaveis.ContainsKey('RADAR_INBOX_ENABLED')) {
   Titulo "Ligando o Atendimento"
-  $paraGravar = $novasVariaveis.GetEnumerator() | ForEach-Object {
-    @{ key = $_.Key; value = $_.Value; type = 'encrypted'; target = @('production') }
+  ChamarApi 'POST' "https://api.vercel.com/v10/projects/$($projeto.id)/env?upsert=true" $cabecalhoVercel @(@{
+    key = 'RADAR_INBOX_ENABLED'; value = 'true'; type = 'encrypted'; target = @('production')
+  }) | Out-Null
+  Passo "ligado"
+}
+
+$palavraMantida = $false
+if ($novasVariaveis.ContainsKey('WHATSAPP_APP_SECRET') -or $novasVariaveis.ContainsKey('WHATSAPP_VERIFY_TOKEN')) {
+  Titulo "Guardando os valores do WhatsApp"
+  foreach ($chave in @('WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN')) {
+    if (-not $novasVariaveis.ContainsKey($chave)) { continue }
+    $resultado = GravarSemSobrescrever $cabecalhoVercel $projeto.id $chave $novasVariaveis[$chave]
+
+    if ($chave -eq 'WHATSAPP_APP_SECRET') {
+      if ($resultado -eq 'gravada') {
+        Passo "chave secreta guardada"
+      } elseif ($resultado -eq 'ja existia') {
+        Passo "o seu painel JA TINHA uma chave secreta guardada, e eu mantive a"
+        Passo "dela: o que voce digitou agora nao substituiu nada. Eu perguntei"
+        Passo "porque a lista de variaveis da Vercel voltou vazia, o que ela faz"
+        Passo "quando os valores estao escondidos. Trocar essa chave faria o"
+        Passo "painel recusar toda mensagem, sem aviso em tela nenhuma."
+      } else {
+        Passo "nao consegui guardar a chave secreta. A Vercel respondeu assim:"
+        Passo "$resultado"
+        Passo "O resto da atualizacao continua; o WhatsApp fica para depois."
+        $faltaOPortal = $false
+      }
+    } else {
+      if ($resultado -eq 'gravada') {
+        Passo "palavra de verificacao guardada"
+      } elseif ($resultado -eq 'ja existia') {
+        $palavraMantida = $true
+        Passo "a palavra de verificacao que o seu painel ja usava foi mantida"
+      } else {
+        Passo "nao consegui guardar a palavra de verificacao. A Vercel respondeu:"
+        Passo "$resultado"
+        $faltaOPortal = $false
+      }
+    }
   }
-  ChamarApi 'POST' "https://api.vercel.com/v10/projects/$($projeto.id)/env?upsert=true" $cabecalhoVercel @($paraGravar) | Out-Null
-  Passo "$($novasVariaveis.Count) valor(es) gravado(s)"
 }
 
 Titulo "Publicando"
@@ -470,37 +579,48 @@ Write-Host ""
 Write-Host "   Agora pode revogar as duas chaves que voce colou no comeco."
 Write-Host ""
 
-if ($jaLigado -or $vouLigar) {
-  Write-Host "   O Atendimento"
+Write-Host "   O Atendimento"
+Write-Host ""
+Write-Host "   O menu tem que mostrar Atendimento. E ali que as conversas"
+Write-Host "   aparecem, com a ficha da pessoa do lado."
+Write-Host ""
+Write-Host "   Falta uma conferencia que so da para fazer no portal da Meta:"
+Write-Host "   no produto Instagram, em Webhooks, o campo messages precisa"
+Write-Host "   estar assinado, alem do comments que voce ja usa. E o"
+Write-Host "   aplicativo precisa estar Ao vivo: em modo de desenvolvimento"
+Write-Host "   ele aceita tudo, mostra tudo pronto e nao entrega mensagem de"
+Write-Host "   quem esta fora dele."
+Write-Host ""
+if ($faltaOPortal) {
+  Write-Host "   O WhatsApp, no portal da Meta"
   Write-Host ""
-  Write-Host "   O menu tem que mostrar Atendimento. E ali que as conversas"
-  Write-Host "   aparecem, com a ficha da pessoa do lado."
+  Write-Host "   Guarde estes dois valores, que sao os do seu painel:"
   Write-Host ""
-  Write-Host "   Falta uma conferencia que so da para fazer no portal da Meta:"
-  Write-Host "   no produto Instagram, em Webhooks, o campo messages precisa"
-  Write-Host "   estar assinado, alem do comments que voce ja usa. E o"
-  Write-Host "   aplicativo precisa estar Ao vivo: em modo de desenvolvimento"
-  Write-Host "   ele aceita tudo, mostra tudo pronto e nao entrega mensagem de"
-  Write-Host "   quem esta fora dele."
-  Write-Host ""
-  if ($faltaOPortal) {
-    Write-Host "   O WhatsApp, no portal da Meta"
+  if ($curto) { Write-Host "     Endereco:  https://$curto/api/webhooks/whatsapp" }
+  else        { Write-Host "     Endereco:  o endereco do seu painel com /api/webhooks/whatsapp no fim" }
+  # A palavra sorteada aqui so vale se ela tiver sido gravada. Se o painel ja
+  # tinha uma, e ela que a Meta vai conferir -- e essa eu nao consigo ler.
+  # Mostrar a sorteada seria mandar colar no portal um valor que o painel nao
+  # reconhece, e a Meta responde so "nao consegui verificar".
+  if ($palavraMantida) {
     Write-Host ""
-    Write-Host "   Guarde estes dois valores, que sao os do seu painel:"
-    Write-Host ""
-    if ($curto) { Write-Host "     Endereco:  https://$curto/api/webhooks/whatsapp" }
-    else        { Write-Host "     Endereco:  o endereco do seu painel com /api/webhooks/whatsapp no fim" }
+    Write-Host "   A palavra de verificacao ja estava guardada no seu painel, e"
+    Write-Host "   eu nao consigo ler ela. Se voce ja salvou o webhook do"
+    Write-Host "   WhatsApp no portal alguma vez, ele continua valendo e nao ha"
+    Write-Host "   o que fazer aqui. Se precisar salvar de novo e nao souber a"
+    Write-Host "   palavra, me chame."
+  } else {
     Write-Host "     Palavra:   $palavraDoWhatsapp"
-    Write-Host ""
-    Write-Host "   No produto WhatsApp, em Configuracao, Webhooks, Editar:"
-    Write-Host "   cole o endereco em URL de callback e a palavra em Token de"
-    Write-Host "   verificacao, clique em Verificar e salvar, e assine o campo"
-    Write-Host "   messages na mesma tela. Esse campo e o passo que mais some:"
-    Write-Host "   sem ele a Meta aceita o endereco e nao entrega nada."
-    Write-Host ""
   }
-  Write-Host "   Travou no portal da Meta? Volte em"
-  Write-Host "   atendente-instalacao.vercel.app com o e-mail e o WhatsApp da"
-  Write-Host "   compra: a Dani conduz essa parte com voce, uma tela por vez."
+  Write-Host ""
+  Write-Host "   No produto WhatsApp, em Configuracao, Webhooks, Editar:"
+  Write-Host "   cole o endereco em URL de callback e a palavra em Token de"
+  Write-Host "   verificacao, clique em Verificar e salvar, e assine o campo"
+  Write-Host "   messages na mesma tela. Esse campo e o passo que mais some:"
+  Write-Host "   sem ele a Meta aceita o endereco e nao entrega nada."
   Write-Host ""
 }
+Write-Host "   Travou no portal da Meta? Volte em"
+Write-Host "   atendente-instalacao.vercel.app com o e-mail e o WhatsApp da"
+Write-Host "   compra: a Dani conduz essa parte com voce, uma tela por vez."
+Write-Host ""
